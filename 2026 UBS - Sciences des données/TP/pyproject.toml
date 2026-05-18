@@ -1,0 +1,10 @@
+[project]
+name = "tp"
+version = "1.0"
+description = "Travaux pratiques de prévision de consommation électrique"
+requires-python = ">=3.13"
+dependencies = [
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.3",
+    "requests>=2.34.0",
+]
