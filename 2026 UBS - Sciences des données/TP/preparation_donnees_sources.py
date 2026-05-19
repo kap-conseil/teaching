@@ -1,5 +1,4 @@
 from datetime import timedelta, datetime
-import json
 from zipfile import ZipFile
 from io import BytesIO
 import requests
@@ -10,10 +9,10 @@ from pandas import (
     concat,
     read_csv,
     to_datetime,
-    read_excel,
     date_range,
 )
 
+# Electricity from RTE for Bretagne region #####################################
 ELEC_DATA_SOURCES = [
     "https://eco2mix.rte-france.com/download/eco2mix/eCO2mix_RTE_Bretagne_Annuel-Definitif_2023.zip",
     "https://eco2mix.rte-france.com/download/eco2mix/eCO2mix_RTE_Bretagne_Annuel-Definitif_2024.zip",
@@ -80,6 +79,7 @@ def collecte_electricite():
     return electricity_data
 
 
+# Météo prévisionnelle pour la Bretagne à J+2 ##################################
 def collecte_meteo():
     # Get from open-meteo
     url = "https://previous-runs-api.open-meteo.com/v1/forecast"
@@ -115,6 +115,7 @@ def collecte_meteo():
     return weather_forecast
 
 
+# Vacances scolaires en France pour la zone B ##################################
 def parse_holiday_datetimes(series: Series) -> Series:
     return to_datetime(
         series,
@@ -160,8 +161,6 @@ def collecte_vacances():
     )
 
     vacations = vacations.explode("date")
-    # Convert datetime to date and clean
-    vacations["date"] = vacations["date"]
     # Drop start_date and end_date columns, and tidy
     vacations.drop(columns=["start_date", "end_date"], inplace=True)
     vacations.dropna(subset=["date"], inplace=True)
@@ -180,6 +179,7 @@ def collecte_et_prepare_donnees_tp():
     meteo = collecte_meteo()
     # vacances
     vacances = collecte_vacances()
+    # Keep only zone B
     vacances = vacances[vacances["zone"] == "Zone B"]
 
     # join them
@@ -193,7 +193,7 @@ def collecte_et_prepare_donnees_tp():
         # insert holiday on the this date
         .join(vacances, how="left", on="date")
         # If description is not null, it means it is a holiday
-        .assign(is_holiday=lambda d: d["description"].notna())
+        .assign(vacances=lambda d: d["description"].notna())
         .drop(columns=["date", "zone", "description"])
     )
 
@@ -223,11 +223,17 @@ def collecte_et_prepare_donnees_tp():
     else:
         pass
 
-    # sort and carry forward the temperature values for the missing timestamps (if any)
-    integrated_data["temperature"] = integrated_data["temperature"].ffill()
+    # Drop duplicates if any, and control if there are duplicated timestamps in the integrated dataset
+    integrated_data = integrated_data[~integrated_data.index.duplicated(keep="first")]
+
+    # sort and carry forward the temperature and vacances values for the missing timestamps (if any)
+    integrated_data["consommation_elec"] = integrated_data["consommation_elec"].ffill()
+    integrated_data["vacances"] = integrated_data["vacances"].ffill()
 
     # insert holiday
     return integrated_data
 
 
-integrated_data = collecte_et_prepare_donnees_tp()
+if __name__ == "__main__":
+    # Backup dataset in parquet
+    collecte_et_prepare_donnees_tp().to_parquet("offline_data/integrated_data.parquet")
