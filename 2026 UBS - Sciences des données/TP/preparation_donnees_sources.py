@@ -5,6 +5,7 @@ import requests
 
 from pandas import (
     DataFrame,
+    DatetimeIndex,
     Series,
     concat,
     read_csv,
@@ -61,6 +62,9 @@ def download_and_extract_zip(url):
         elec_table.set_index("datetime", inplace=True)
         elec_table = elec_table[elec_table.index.notna()]
 
+        # Apply types
+        elec_table["consommation_elec"] = elec_table["consommation_elec"].astype(float)
+
         return elec_table
     else:
         raise RuntimeError(
@@ -90,7 +94,7 @@ def collecte_meteo():
         # Collect as UTC, to next convert to paris time
         "timezone": "UTC",
         "start_date": "2022-11-10",
-        "end_date": (datetime.today() + timedelta(days=4)).strftime("%Y-%m-%d"),
+        "end_date": (datetime.today() + timedelta(days=2)).strftime("%Y-%m-%d"),
     }
     response = requests.get(url, params=params)
 
@@ -111,6 +115,9 @@ def collecte_meteo():
     ).dt.tz_convert("Europe/Paris")
 
     weather_forecast.drop(columns=["datetime"], inplace=True)
+
+    # Type of temperature column
+    weather_forecast["temperature"] = weather_forecast["temperature"].astype(float)
 
     return weather_forecast
 
@@ -166,6 +173,7 @@ def collecte_vacances():
     vacations.dropna(subset=["date"], inplace=True)
     # keep uique rows, sort by date and set date as index
     vacations = vacations.drop_duplicates()
+
     # vacations.sort_values("date", inplace=True)
     vacations.set_index("date", inplace=True)
 
@@ -185,53 +193,76 @@ def collecte_et_prepare_donnees_tp():
     # join them
     # insert meteo
     integrated_data = (
-        electricite.join(meteo, how="left")
+        # join into electricity and keep outer to keep meteo beyond the last timestamp of electricity data
+        electricite.join(meteo, how="outer")
         # add date for integrating holiday
         .assign(
             date=lambda d: to_datetime(d.index).floor("D"),
         )
         # insert holiday on the this date
         .join(vacances, how="left", on="date")
-        # If description is not null, it means it is a holiday
+        # If description of vacances is not null, it means it is a holiday
         .assign(vacances=lambda d: d["description"].notna())
         .drop(columns=["date", "zone", "description"])
     )
 
     # Drop rows for half hours in the datetime (no temperature data for these rows)
     integrated_data = integrated_data[integrated_data.index.minute == 0]
-
     # Sort on index
     integrated_data.sort_index(inplace=True)
-
     # Control if regular grid from first to last index value, with a frequency of 1 hour
     expected_index = date_range(
         start=integrated_data.index.min(), end=integrated_data.index.max(), freq="h"
     )
     # Identify missing timestamps in the integrated dataset and fill them with NaN values if less than 10 missing timestamps, otherwise raise an error
     missing_timestamps = expected_index.difference(integrated_data.index)
+
     if (not missing_timestamps.empty) & (len(missing_timestamps) < 10):
-        # Create a DataFrame with the missing timestamps and NaN values for the other columns
-        missing_data = DataFrame(
-            index=missing_timestamps, columns=integrated_data.columns
-        )
+        # Create missing rows while preserving original dtypes
+        missing_data = integrated_data.iloc[:0].reindex(missing_timestamps)
         # Append the missing data to the integrated dataset and sort by index
         integrated_data = concat([integrated_data, missing_data], axis=0).sort_index()
+        integrated_data["vacances"] = integrated_data["vacances"].astype(bool)
     elif len(missing_timestamps) >= 10:
         raise RuntimeError(
             f"Too many missing timestamps in the integrated dataset: {len(missing_timestamps)}. Missing timestamps: {missing_timestamps}"
         )
     else:
         pass
-
     # Drop duplicates if any, and control if there are duplicated timestamps in the integrated dataset
     integrated_data = integrated_data[~integrated_data.index.duplicated(keep="first")]
 
     # sort and carry forward the temperature and vacances values for the missing timestamps (if any)
-    integrated_data["consommation_elec"] = integrated_data["consommation_elec"].ffill()
+    integrated_data["consommation_elec"] = integrated_data["consommation_elec"].ffill(
+        limit_area="inside"
+    )  # Do not fill beyond the last available data point, to avoid filling with old data for future timestamps
     integrated_data["vacances"] = integrated_data["vacances"].ffill()
+
+    # Cut data prior the first available data of electricity: one need to have the same time range for all train features
+    integrated_data = integrated_data[integrated_data.index >= electricite.index.min()]
+
+    # Cut data after last available electricity consumption data + 48 h
+    integrated_data = integrated_data[
+        integrated_data.index <= (electricite.index.max() + timedelta(hours=48))
+    ]
 
     # insert holiday
     return integrated_data
+
+
+def ajouter_indicateurs_temporels(df: DataFrame) -> DataFrame:
+    datetime_index = (
+        df.index if isinstance(df.index, DatetimeIndex) else to_datetime(df.index)
+    )
+
+    # Add second in day
+    df["minute_in_day"] = datetime_index.hour * 60 + datetime_index.minute
+    # Add day in week
+    df["day_of_week"] = datetime_index.dayofweek
+    # Day in year
+    df["day_of_year"] = datetime_index.dayofyear
+
+    return df
 
 
 if __name__ == "__main__":
