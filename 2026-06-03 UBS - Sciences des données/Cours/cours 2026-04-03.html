@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.25">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>cours-2026-04-03</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="cours 2026-04-03_files/libs/clipboard/clipboard.min.js"></script>
+<script src="cours 2026-04-03_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="cours 2026-04-03_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="cours 2026-04-03_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="cours 2026-04-03_files/libs/quarto-html/popper.min.js"></script>
+<script src="cours 2026-04-03_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="cours 2026-04-03_files/libs/quarto-html/anchor.min.js"></script>
+<link href="cours 2026-04-03_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="cours 2026-04-03_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="cours 2026-04-03_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="cours 2026-04-03_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="cours 2026-04-03_files/libs/bootstrap/bootstrap-303a7ef2595af419f0c90304a78c4f07.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<section id="entre-théorie-et-pratique---outil-de-prévision-pour-la-prévision-agronomique-basé-sur-la-méthode-de-gradient-boosting" class="level1">
+<h1>Entre théorie et pratique - Outil de prévision pour la prévision agronomique basé sur la méthode de gradient boosting</h1>
+<p><strong>UBS - Sciences des données || 3 juin 2026</strong> <strong><a href="mailto:jgooris@kap.bzh">Julien Gooris</a></strong></p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="https://www.kap.bzh/"><img src="https://www.kap.bzh/assets/logo-kap-OCks7eSr.jpg" class="img-fluid figure-img"></a></p>
+<figcaption>w:400</figcaption>
+</figure>
+</div>
+<section id="agenda-de-la-session" class="level2">
+<h2 class="anchored" data-anchor-id="agenda-de-la-session">Agenda de la session</h2>
+<ul>
+<li>Contexte métier et objectif de prévision agronomique</li>
+<li>Séries temporelles et dépendances temporelles</li>
+<li>Stationnarité et transformation en rendement</li>
+<li>Métriques de prévision et fonction de perte (MAE)</li>
+<li>Comparaison des modèles de prévision</li>
+<li>Random Forest : principes et fonctionnement</li>
+<li>Gradient Boosting : principes et fonctionnement</li>
+<li>Modèles globaux vs modèles locaux</li>
+<li>Validation croisée pour séries temporelles</li>
+<li>Hyperparamétrage et approches</li>
+</ul>
+</section>
+<section id="point-de-départ" class="level2">
+<h2 class="anchored" data-anchor-id="point-de-départ">Point de départ</h2>
+<p>Demande d’une entreprise (coopérative SICA - Prince de Bretagne) pour faire de la prévision agronomique appliquée à la production maraichère (tomates, choux, etc.) : * <strong>Horizon</strong> de prévisions en semaines : <span class="math inline">\(h \in \{1, \dots, 6\}\)</span> * <strong>Maille</strong> : par variété (ex : cerise, grappe, cœur de bœuf et bio/conventionnel) <span class="math inline">\(v\)</span>, au producteur (l’exploitation maraîchère) <span class="math inline">\(p\)</span>, * <strong>Temporalité</strong> (<span class="math inline">\(t\)</span>) à deux niveaux : des campagnes de production (de mars à octobre) annuelles et des semaines de production * <strong>Facteurs de production</strong> complexes : ensoleillement, température, âge des plantes, type de serres, pratique des producteurs (<span class="math inline">\(X_{v,p,t}\)</span>)</p>
+</section>
+<section id="quelle-grandeur-prévoir" class="level2">
+<h2 class="anchored" data-anchor-id="quelle-grandeur-prévoir">Quelle grandeur prévoir ?</h2>
+<p><strong>Grandeur finale souhaitée</strong> : la production de tomates <span class="math inline">\(q_{v,p,t+h}\)</span> (en tonnes) par variété, par producteur et pour dans <em>h</em> semaines</p>
+<p>➡️ Etudions le processus pour savoir comment et s’il faut prévoir <em>directement</em> cette grandeur ou si des contraintes requirent de prévoir une <em>grandeur intermédiaire</em> <!-- 
+* **Grandeur intermédiaire** : la rendement de tomates par semaine $r_{v,p,t}$ (masse par m² et par semaine). Ensuite multiplié par les surfaces cultivées. --></p>
+</section>
+<section id="processus-temporel" class="level2">
+<h2 class="anchored" data-anchor-id="processus-temporel">Processus temporel</h2>
+<ul>
+<li><p><strong>Le temps conditionne la prévision</strong> : météo, âge des plantes, pratiques agricoles, variétés, formation des fruits, etc. évoluent dans le temps</p>
+<ul>
+<li>Dépendance entre les semaines : <span class="math inline">\(Q_{v,p,t} \text{ dépend de } Q_{v,p,t-k}\)</span> pour <span class="math inline">\(k \in \{1, \dots, \text{début de la campagne}\}\)</span> (ex : âge des plantes, formation des fruits, etc.)</li>
+<li>Indépendance entre les campagnes : <span class="math inline">\(Q_{v,p,t} \text{ ne dépend pas de } Q_{v,p,t-k.\text{année}}\)</span></li>
+</ul></li>
+</ul>
+<p>➡️ Traitement en série temporelle indispensable : non-échangeabilité des données, dont dépendances temporelles, au sein des campagnes</p>
+</section>
+<section id="stationnarité" class="level2">
+<h2 class="anchored" data-anchor-id="stationnarité">Stationnarité</h2>
+<p><strong>Définition (stationnarité faible) :</strong> Pour un processus stochastique <span class="math inline">\(\{Z_{t}\}\)</span> : * <span class="math inline">\(\mathbb{E}[Z_{t}] = \mu \qquad \forall t\)</span> * <span class="math inline">\(\mathbb{Var}[Z_{t}] = \sigma^2 \qquad \forall t\)</span> * <span class="math inline">\(\text{Cov}(Z_{t}, Z_{t+h}) = \gamma(h) \qquad \forall t, \forall h&lt; t\)</span></p>
+<p>Condition requise pour les modèles de prévision classiques (ARIMA, principales méthodes de ML) : les propriétés statistiques du processus ne changent pas au cours du temps</p>
+</section>
+<section id="stationnarité-conditionnelle" class="level2">
+<h2 class="anchored" data-anchor-id="stationnarité-conditionnelle">Stationnarité conditionnelle</h2>
+<p>Ici le processsus et les modèles sont conditionnels aux facteurs de production (nos futurs régresseurs) <span class="math inline">\(X_{v,p,t}\)</span>. Plutôt que <span class="math inline">\(Z_{t}\)</span>, on considère <span class="math inline">\(Q_{v,p,t}=g(X_{v,p,t}, \epsilon_{v,p,t})\)</span>. La stationarité est alors définie par les propriétés suivantes : * <span class="math inline">\(\mathbb{E}[q_{t}\mid X_{v,p,t}] = \mu({X_{v,p,t}})\)</span> pour tout <span class="math inline">\(t\)</span> * <span class="math inline">\(\text{Var}(q_{t}\mid X_{v,p,t}) = \sigma^2({X_{v,p,t}})\)</span> pour tout <span class="math inline">\(t\)</span> * <span class="math inline">\(\text{Cov}(q_{t}, q_{t+h}\mid X_{v,p,t}) = \gamma({X_{v,p,t}})_h\)</span> pour tout <span class="math inline">\(t\)</span></p>
+<p>Et en <strong>pratique pour les légumes ?</strong> * Quid des nouvelles serres de producteurs : quantités jamais vues, espérance varie dans le temps ➡️ Les quantités produites sont non stationnaires</p>
+</section>
+<section id="stationarisation" class="level2">
+<h2 class="anchored" data-anchor-id="stationarisation">Stationarisation</h2>
+<p><strong>Modèle intermédiaire</strong>: Plutôt que les quantités, prévoir une grande “stable” ➡️ Le rendement (quantité par unité de surface) : <span class="math inline">\(r_{v,p,t} = \frac{q_{v,p,t}}{S_{v,p,t}}\)</span> (en tonnes par m²)</p>
+<p>On pourra confirmer la stationnarité conditionnelle sur les résidus du processus du rendement (<span class="math inline">\(g\prime\)</span> est le processus estimé par notre modèle): <span class="math inline">\(\epsilon_{v,p,t} =Q_{v,p,t} - g\prime(X_{v,p,t})\)</span></p>
+<p>La stabilité en moyenne et l’absence de dérive stochastique (par exemple une croissance d’année en année de culture) sont vérifiables au moyen d’un test de <em>Dickey-Fuller augmenté</em> (ADF) sur les résidus <span class="math inline">\(\epsilon_{v,p,t}\)</span>.</p>
+</section>
+<section id="non-échangeabilité-des-données" class="level2">
+<h2 class="anchored" data-anchor-id="non-échangeabilité-des-données">Non-échangeabilité des données</h2>
+<ul>
+<li><p>Définition : Une suite de variables aléatoires <span class="math inline">\((Z_1,…,Z_t)\)</span> est échangeable si sa loi jointe est invariante par permutation des indices.</p></li>
+<li><p><strong>Dans les champs :</strong></p>
+<ul>
+<li>Pour les tomates, par exemple, cela revient à dire qu’au printemps avoir une semaine de basse production suivie par un semaine de haute production est aussi probable que l’inverse</li>
+<li>Faux en pratique : on accumule du soleil, la production augmente au fil des semaine au printemps. Les données entre les semaines ne sont pas indépendantes et identiquement distribuées (i.i.d.) dans le temps.</li>
+</ul></li>
+</ul>
+<p>➡️ Besoin de capturer les <strong>dépendances temporelles</strong> avec les interactions complexes entre les facteurs de production.</p>
+<p>Les méthodes d’apprentissage automatiques doivent respecter ces propriétés pour être valides : échantillon de test, cross-validation, choix des regresseurs, etc.</p>
+</section>
+<section id="quest-ce-quune-bonne-prévision-ici" class="level2">
+<h2 class="anchored" data-anchor-id="quest-ce-quune-bonne-prévision-ici">Qu’est-ce qu’une bonne prévision ici ?</h2>
+<p><strong>Une fonction de perte dictée par les besoins de l’entreprise :</strong></p>
+<p><strong>Mieux prévoir pour 1/ mieux planifier les ressources (main d’oeuvre, logistique, etc.) et 2/ pour mieux vendre (placer ses productions à bon prix)</strong></p>
+<p>Hypothèses raisonnables : * une erreur de prév. de même grandeur <span class="math inline">\(e\)</span> ou <span class="math inline">\(-e\)</span> à la hausse ou à la baisse a un coût similaire pour l’entreprise, * un doublement de l’erreur a un coût pour l’entreprise environ du double,</p>
+<p>➡️ Une perte linaire (et symétrique) de l’erreur de prévision est un choix intéressant : une MAE donnée par <span class="math inline">\(L(y, \hat{y}) = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|\)</span></p>
+</section>
+<section id="choix-de-lalgorithme---quels-critères" class="level2">
+<h2 class="anchored" data-anchor-id="choix-de-lalgorithme---quels-critères">Choix de l’algorithme - quels critères ?</h2>
+<ul>
+<li><strong>Performance prédictive</strong> : capacité à minimiser la fonction de perte choisie (MAE)</li>
+<li><strong>Mise en oeuvre</strong> : facilité d’implémentation (temps de calcul), de maintenance (réapprentissage) et de mise à jour du modèle</li>
+<li><strong>Robustesse</strong> : capacité à maintenir de bonnes précisions face à des données nouvelles ou légèrement différentes (capacité à généraliser)</li>
+<li><strong>Interprétabilité</strong> : capacité à auditer, “expliquer” les prévisions et à identifier les facteurs principaux</li>
+</ul>
+</section>
+<section id="choix-de-lalgorithme---quels-candidats" class="level2">
+<h2 class="anchored" data-anchor-id="choix-de-lalgorithme---quels-candidats">Choix de l’algorithme - quels candidats ?</h2>
+<ul>
+<li><p><strong>Modèles linéaires et ARMA</strong> : Classe de modèles avec des relations linéraires et des dépendances temporelles simples (autoregressif et moyenne mobiles), mais qui ne capturent pas les interactions complexes et les non-linarités des facteurs de production,</p></li>
+<li><p><strong>RandomForest</strong> : Méthode de bagging qui construit une multitude d’arbres de décision et agrège leurs prédictions,</p></li>
+<li><p><strong>Gradient boosting</strong> (moderne : XGBoost, LightGBM, CatBoost) : Méthode d’ensemble qui construit des arbres de décision de manière séquentielle, en corrigeant les erreurs des arbres précédents,</p></li>
+<li><p>…beaucoup d’autres méthodes : des “plus proches voisins” (<em>KNN</em>) aux réseaux de neurones (comme les LSTM, RNN) Et maintenant, les modèles de fondation pour séries chronologiques : TimeGPT, Chronos.</p></li>
+</ul>
+</section>
+<section id="choix-de-lalgorithme---enjeu-dans-le-cas-des-séries-temporelles" class="level2">
+<h2 class="anchored" data-anchor-id="choix-de-lalgorithme---enjeu-dans-le-cas-des-séries-temporelles">Choix de l’algorithme - enjeu dans le cas des séries temporelles ?</h2>
+<p>Pour les séries temporelles, les enjeux restent : - la compréhension du processus, - les dynamiques de la croissance ici et des facteurs agronomiques, - la dérivation des facteurs exogènes et liens temporels.</p>
+<p>Différents algorithmes peuvent être utilisés s’ils valident les critères évoqués. Les méthodes d’ensemble (Random Forest, Gradient Boosting) sont souvent préférées pour leur capacité à capturer des interactions complexes et à fournir de bonnes performances prédictives, même avec des données non linéaires et hétérogènes.</p>
+<p>➡️ <strong>Comparaison entre Random Forest et Gradient Boosting</strong></p>
+<p>Une prévision sur des séries temporelles qui fonctionne se base avant tout sur la compréhension du processus et des dynamiques de croissance, avoir les bons régresseurs, avant de faire de l’ingénierie ML (MLOps).</p>
+</section>
+<section id="zoom-sur-le-random-forest---logique" class="level2">
+<h2 class="anchored" data-anchor-id="zoom-sur-le-random-forest---logique">Zoom sur le Random Forest - logique</h2>
+<ul>
+<li>Basé sur la construction décorrelée de multiples arbres de décision,</li>
+<li>Le bagging est réalisé en prenant la moyenne de prévision de chaque arbre,</li>
+<li>Compromis bias-variance :
+<ul>
+<li>Individuellement, chaque arbre est <strong>peu biaisé</strong> (prévoit en espérance correctement la valeur vue sur l’échantillon d’apprentissage), mais avec une <strong>grande variance</strong> (sensibles aux variations des données),</li>
+<li>L’aggrégation des arbres pour la prévision <strong>réduit la variance</strong> et améliore la performance globale du modèle.</li>
+</ul></li>
+</ul>
+</section>
+<section id="zoom-sur-le-random-forest---algorithme" class="level2">
+<h2 class="anchored" data-anchor-id="zoom-sur-le-random-forest---algorithme">Zoom sur le Random Forest - algorithme :</h2>
+<p>Etapes :</p>
+<ol type="1">
+<li>Pour <span class="math inline">\(b = 1\)</span> à <span class="math inline">\(B\)</span> (autant que d’arbres) :
+<ol type="a">
+<li>Tirer un échantillon (bootstrap) de taille <span class="math inline">\(N\)</span> à partir des données d’entraînement</li>
+<li>Construire un arbre de décision <span class="math inline">\(T_b\)</span> sur cet échantillon, en sélectionnant aléatoirement un sous-ensemble de caractéristiques à chaque nœud jusqu’à ce que le noeud est atteint la taille minimal est atteinte, en suivant les étapes :</li>
+<li>Sélectionner aléatoirement <span class="math inline">\(m\)</span> caractéristiques parmi les <span class="math inline">\(p\)</span> disponibles</li>
+</ol>
+<ol start="2" type="i">
+<li>Trouver la meilleure division de l’arbre en utilisant ces <span class="math inline">\(m\)</span> caractéristiques</li>
+<li>Partager le noeud en deux nouveaux (sous) noeuds</li>
+</ol></li>
+<li>Retourner l’ensemble des arbres <span class="math inline">\(T_1, T_2, ..., T_B\)</span></li>
+</ol>
+<p>Pour faire une prédiction pour une nouvelle observation <span class="math inline">\(x\)</span> : 1. Obtenir la prédiction de chaque arbre : <span class="math inline">\(\hat{y}_b = T_b(x)\)</span> pour <span class="math inline">\(b = 1, ..., B\)</span> 2. Agréger les prédictions : <span class="math inline">\(\hat{y} = \frac{1}{B} \sum_{b=1}^{B} \hat{y}_b\)</span></p>
+<blockquote class="blockquote">
+<p>Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). The elements of statistical learning.</p>
+</blockquote>
+</section>
+<section id="zoom-sur-le-gradient-boosting---logique" class="level2">
+<h2 class="anchored" data-anchor-id="zoom-sur-le-gradient-boosting---logique">Zoom sur le Gradient Boosting - logique</h2>
+<ul>
+<li><strong>Objectif :</strong> trouver une fonction <span class="math inline">\(f(x)\)</span> qui minimise la fonction de perte <span class="math inline">\(L(y, f(x))\)</span>,</li>
+<li>Construction séquentielle d’arbres de décision : chaque arbre corrige les résidus des arbres précédents,</li>
+<li><strong>Compromis entre biais et variance :</strong>
+<ul>
+<li>Chaque arbre corrige une part des erreurs des arbres précédents ➡️ Réduction progressive du biais</li>
+<li>Mais au fil des itérations, l’apprentissage est basé sur des détails de plus en plus fins, et une structure de modèle plus complexe qui donnent plus de dépendances aux données d’apprentissage ➡️ Augmentation de la variance,</li>
+</ul></li>
+</ul>
+</section>
+<section id="zoom-sur-le-gradient-boosting---algorithme" class="level2">
+<h2 class="anchored" data-anchor-id="zoom-sur-le-gradient-boosting---algorithme">Zoom sur le Gradient Boosting - algorithme :</h2>
+<p>Etapes :</p>
+<ol type="1">
+<li>Initialiser le modèle avec une prédiction constante</li>
+<li>Pour <span class="math inline">\(m = 1\)</span> à <span class="math inline">\(M\)</span> (nombre d’itérations) :
+<ol type="a">
+<li>Calculer les résidus : <span class="math inline">\(r_{im} = -\left[\frac{\partial L(y_i, f(x_i))}{\partial f(x_i)}\right]_{f(x) = f_{m-1}(x)}\)</span> pour <span class="math inline">\(i = 1, ..., N\)</span></li>
+<li>Ajuster un arbre de décision <span class="math inline">\(h_m(x)\)</span> pour prédire les résidus <span class="math inline">\(r_{im}\)</span> à partir des caractéristiques <span class="math inline">\(x_i\)</span></li>
+<li>Trouver le meilleur coefficient de mise à jour : <span class="math inline">\(\gamma_m = \arg\min_{\gamma} \sum_{i=1}^{N} L(y_i, f_{m-1}(x_i) + \gamma h_m(x_i))\)</span></li>
+<li>Mettre à jour le modèle : <span class="math inline">\(f_m(x) = f_{m-1}(x) + \gamma_m h_m(x)\)</span></li>
+</ol></li>
+<li>Retourner le modèle final : <span class="math inline">\(f_M(x)\)</span></li>
+</ol>
+<blockquote class="blockquote">
+<p>Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). The elements of statistical learning.</p>
+</blockquote>
+</section>
+<section id="un-modèle-global-vs-des-modèles-locaux---vu-des-champs" class="level2">
+<h2 class="anchored" data-anchor-id="un-modèle-global-vs-des-modèles-locaux---vu-des-champs">Un modèle global Vs des modèles locaux - vu des champs</h2>
+<p><strong>Modèle global :</strong> <em>un seul modèle</em> pour prévoir les rendements de toutes les variétés, tous les producteurs et tous les horizons à prévoir. Le modèle est informé par des variables exogènes des variétés, producteurs, horizons à prévoir. <strong>Modèles locaux :</strong> un modèle par variété, et/ou par producteur et/ou par horizon à prévoir.</p>
+<p><strong>Déjà identifié :</strong> prévoir le rendement par semaine, producteur, variété : <span class="math inline">\(r_{v,p,t} = \frac{q_{v,p,t}}{S_{v,p,t}}\)</span> (en tonnes par m²), mais quid de la maille d’apprentissage du modèle ?</p>
+</section>
+<section id="un-modèle-global-vs-des-modèles-locaux---quelle-maille" class="level2">
+<h2 class="anchored" data-anchor-id="un-modèle-global-vs-des-modèles-locaux---quelle-maille">Un modèle global Vs des modèles locaux - quelle maille ?</h2>
+<p><strong>Un modèle versus plusieurs modèles et à quelle maille ?</strong> - 1/ Un par campagne (année) ? <em>(Très) mauvaise idée car il faut un modèle chaque année, donc pas d’historique d’une année à l’autre et pas de prévision pour les nouvelles campagnes…</em> - 2/ Un par producteur ? <em>Mauvaise idée car il y a des nouveaux producteurs sans historique chaque année</em> - 3/ Un par variété ? <em>Pourquoi pas si les variétés ont de l’historique</em> - 4/ Un par horizon à prévoir ? <em>Pourquoi pas un modèle appris par horizon plûtot qu’un modèle multi-horizon (prévoit les 6 horizons en même temps).</em></p>
+<p><strong>3/</strong> a été testé dans le cas présent avec empiriquement une sous-performance des modèles appris par variété versus un modèle global (multi-variété avec regresseur donnant la variété).</p>
+<p><strong>4/</strong> n’a pas été testé : pour cette mise en oeuvre, il faut construire un dataset d’apprentissage avec les 6 horizons à prévoir en même temps. ➡️ Pratiquement, pour de faibles gains possibles.</p>
+</section>
+<section id="un-modèle-global-vs-des-modèles-locaux---vu-de-la-recherche" class="level2">
+<h2 class="anchored" data-anchor-id="un-modèle-global-vs-des-modèles-locaux---vu-de-la-recherche">Un modèle global Vs des modèles locaux - vu de la recherche</h2>
+<p>Pour les prévisions de séries chronologiques, la question de l’apprentissage global (un modèle pour plusieurs séries) versus local (un modèle par série) est un sujet de recherche actif. Papier de référence sur ce sujet :</p>
+<blockquote class="blockquote">
+<p>Montero-Manso, P., &amp; Hyndman, R. J. (2021). Principles and algorithms for forecasting groups of time series: Locality and globality. International Journal of Forecasting, 37(4), 1632-1653.</p>
+</blockquote>
+<p><strong>Local vs global :</strong> Un modèle global peut reproduire exactement ce qu’un ensemble de modèles locaux ferait. Mais un modèle global peut aussi apprendre des régularités communes à toutes les séries, ce qui peut améliorer la précision de la prévision, surtout pour les séries avec peu de données. L’article souligne les capacités à garder des précisions importantes même lorsque les séries sont hétérogènes.</p>
+<p><strong>Diversité des séries :</strong> les modèles locaux deviennent compliqués quand il y a beaucoup de séries. La complexité de mise en oeuvre augmente aussi (gérer de nombreux modèles)</p>
+<p><strong>Recommandation :</strong> Favoriser l’usage de modèles globaux, en particulier si les données sont limitées et même s’il y a de l’hétérogénéité connue entre les série. Une validation empiriques spécifiquement sur les données est conseillée pour confirmer ce choix.</p>
+<p><strong>Locution reprise par l’article : “Unus pro omnibus, omnes pro uno” - “Un pour tous et tout pour un”</strong></p>
+</section>
+<section id="validation-croisée---en-théorie" class="level2">
+<h2 class="anchored" data-anchor-id="validation-croisée---en-théorie">Validation croisée - en théorie</h2>
+<p>Pourquoi c’est indispensable ?</p>
+<ul>
+<li>Permet d’estimer la <strong>performance du modèle sur des données non vues</strong> à l’apprentissage</li>
+<li>Permet de <strong>comparer différents modèles</strong> et de choisir les meilleurs hyperparamètres</li>
+<li>Permet de <strong>prévenir le surapprentissage</strong> (overfitting) : en évaluant la performance sur des données de test, on peut détecter si le modèle s’adapte trop aux données d’apprentissage et ne généralise pas bien</li>
+<li>Permet d’obtenir une <strong>estimation plus fiable de la performance du modèle en moyenne</strong> sur plusieurs partitions des données</li>
+</ul>
+</section>
+<section id="validation-croisée-sur-les-séries-temporelles---approche-de-tirage-aléatoire-kfold" class="level2">
+<h2 class="anchored" data-anchor-id="validation-croisée-sur-les-séries-temporelles---approche-de-tirage-aléatoire-kfold">Validation croisée sur les séries temporelles - approche de tirage aléatoire (KFold)</h2>
+<p>Les observations ne sont pas échangeables dans le temps : l’ordre des observations importe. La distribution jointe des données n’est pas invariante par permutation des indices temporels</p>
+<p>➡️ Il est impératif de ne pas casser l’ordre temporel des données lors de la validation croisée.</p>
+<ul>
+<li><em>Exemple de de validation croisée inadaptée pour les séries temporelles</em></li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../Cours/assets/cv_kfold.png" class="img-fluid figure-img"></p>
+<figcaption>w:700</figcaption>
+</figure>
+</div>
+<ul>
+<li>mélange des données d’apprentissage et de test (rouge et bleu), ce qui peut conduire à une fuite de données (data leakage),</li>
+<li>corrélations temporelles entre les observations mélangées d’apprentissage et de test (proximité de données d’apprentissage et de test dans le temps) qui ne reflètent pas la réalité de la prévision</li>
+</ul>
+<p>➡️ Modèles de prévisions alors mal estimés et performances sur-évaluées</p>
+</section>
+<section id="validation-croisée-sur-les-séries-temporelles---forward-chaining" class="level2">
+<h2 class="anchored" data-anchor-id="validation-croisée-sur-les-séries-temporelles---forward-chaining">Validation croisée sur les séries temporelles - Forward chaining</h2>
+<p><em>Exemple de de validation croisée adaptée pour les séries temporelles</em></p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../Cours/assets/cv_timeseries.png" class="img-fluid figure-img"></p>
+<figcaption>w:700</figcaption>
+</figure>
+</div>
+</section>
+<section id="validation-croisée-sur-les-séries-temporelles---forward-chaining-1" class="level2">
+<h2 class="anchored" data-anchor-id="validation-croisée-sur-les-séries-temporelles---forward-chaining-1">Validation croisée sur les séries temporelles - Forward chaining</h2>
+<p><strong>Forward chaining (ou “time series split”)</strong> est une approche de validation croisée adaptée pour les séries temporelles qui respecte l’ordre temporel des données. Les données de validation sont toujours postérieures et non-mélangées aux données d’apprentissage, ce qui reflète mieux la réalité de la prévision.</p>
+<p><strong>Usage d’une approche de Forward chaining (cross validation pour série temporelles)</strong> : - respecte l’ordre temporel des données, - utilise les observations passées pour prédire les observations futures, - permet d’évaluer la performance du modèle de manière réaliste pour les séries temporelles</p>
+<p>➡️ Modèles de prévisions correctement évalués et performances plus réalistes</p>
+</section>
+<section id="gradient-boosting-et-ses-hyperparamètres" class="level2">
+<h2 class="anchored" data-anchor-id="gradient-boosting-et-ses-hyperparamètres">Gradient boosting et ses hyperparamètres</h2>
+<p><strong>Différentes classes :</strong></p>
+<ul>
+<li><p>1/ Dynamique d’apprentissage : controle la séquence de construction des arbres avec le nombre d’arbres, taux d’apprentissage (Learning rate)</p></li>
+<li><p>2/ Complexité de chaque arbre : définit la structure de chaque arbre de décision (profondeur maximale, nombre de feuilles, etc.) et contrôle la capacité du modèle à capturer des interactions complexes entre les variables</p></li>
+<li><p>3/ Régularisation : évite le surapprentissage, via des termes de pénalité à la fonction de perte pour encourager la simplicité du modèle</p></li>
+<li><p>Hyperparamètres spécifiques à l’implémentation (ex : XGBoost, LightGBM, CatBoost)</p></li>
+</ul>
+<p>Plus le modèle est complexe, plus : * le modèle s’adapte mieux aux données d’entraînement (moins de biais) * mais il devient plus sensible aux fluctuations du dataset (plus de variance des prévisions)</p>
+<p><strong>Objectif du choix des hyperparamètres :</strong> choisir le compromis entre biais et variance, celui qui minimise la fonction de perte choisie (MAE) sur les données de test**</p>
+</section>
+<section id="trouver-la-bonne-recette-dhypeparamètres" class="level2">
+<h2 class="anchored" data-anchor-id="trouver-la-bonne-recette-dhypeparamètres">Trouver la bonne recette d’hypeparamètres</h2>
+<p>Pour minimiser la fonction de perte sur les données de test, des ensembles d’hyperparamètres sont testéés. Différentes logiques existent, comme en cuisine : * tester systématiquement toutes les combinaisons possibles des dosages de farine, sucre et sel sur une grille ➡️ GridSearch * tester des combinaisons aléatoires de dosages ➡️ RandomSearch * utiliser les résultats des essais précédents pour guider les prochaines recettes testées ➡️ Optimisation bayésienne</p>
+<p><strong>Supériorité de l’optimisation bayésienne :</strong> elle permet de trouver des ensembles d’hyperparamètres performants en moins d’essais que les autres méthodes (librairie Python : Optuna)</p>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
